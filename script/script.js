@@ -110,15 +110,15 @@ function initUserTasks(userId) {
 function generateNewTasks(userId) {
 	const tasks = [
 		{ id: 1, title: 'Добыть 64 алмаза', reward: 50, type: 'mining' },
-		{ id: 2, title: 'Победить 10 игроков в PvP', reward: 100, type: 'pvp' },
-		{ id: 3, title: 'Построить дом 10x10', reward: 30, type: 'building' },
-		{ id: 4, title: 'Добыть 128 железа', reward: 40, type: 'mining' },
+		{ id: 2, title: 'Убить 10 игроков', reward: 100, type: 'pvp' },
+		{ id: 3, title: 'Построить дом 10x10 для лоха', reward: 30, type: 'building' },
+		{ id: 4, title: 'Стать лохом', reward: 40, type: 'mining' },
 		{ id: 5, title: 'Приручить 5 волков', reward: 25, type: 'taming' },
 		{ id: 6, title: 'Убить эндер дракона', reward: 200, type: 'boss' },
 		{ id: 7, title: 'Собрать 64 изумруда', reward: 80, type: 'mining' },
-		{ id: 8, title: 'Провести 2 часа онлайн', reward: 20, type: 'activity' },
-		{ id: 9, title: 'Помочь участнику клана', reward: 35, type: 'social' },
-		{ id: 10, title: 'Найти крепость', reward: 60, type: 'exploration' },
+		{ id: 8, title: 'Просто так', reward: 20, type: 'activity' },
+		{ id: 9, title: 'Помочь участнику стать лохом', reward: 35, type: 'social' },
+		{ id: 10, title: 'Найти крепость лоха', reward: 60, type: 'exploration' },
 	]
 
 	const shuffled = tasks.sort(() => Math.random() - 0.5)
