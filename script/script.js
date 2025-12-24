@@ -1,4 +1,35 @@
-// Инициализация DOM элементов
+
+//? Модальные окна:
+//?openLoginModal() - открытие регистрации
+//? openSignInModal() - открытие входа
+//? openApplicationModal() - открытие заявки
+//? closeAllModals() - закрытие всех модалок
+//? closeModalOnBackgroundClick() - клик по фону
+
+//? Авторизация:
+//? checkAuthStatus() - проверка статуса пользователя
+//? handleSignUpSubmit() - обработка регистрации
+//? handleSignInSubmit() - обработка входа
+//? handleApplicationSubmit() - обработка заявки
+
+//? Система заданий:
+//? initUserTasks() - инициализация задач
+//? generateNewTasks() - генерация заданий
+//? completeTask() - выполнение задания
+//? skipTask() - пропуск задания
+//? checkTaskTimer() - таймер заданий
+//? renderTasks() - отрисовка заданий
+
+//? UI и данные:
+//? updatePointsDisplay() - обновление очков
+//? calculateTimeInClan() - время в клане
+//? loadLeaderboard() - лидерборд
+//? loadClanMembers() - состав клана
+//? initializeApp() - полная инициализация
+
+//!================================================= 
+
+//* Инициализация DOM элементов
 const loginModal = document.getElementById('loginModal')
 const signInModal = document.getElementById('signInModal')
 const applicationModal = document.getElementById('applicationModal')
@@ -9,24 +40,21 @@ const closeButtons = document.getElementsByClassName('close-button')
 const profileLink = document.getElementById('profileLink')
 const logoutBtn = document.getElementById('logoutBtn')
 
-// Открытие модального окна регистрации
+//* Открытие модального окна регистрации
 signUpBtn?.addEventListener('click', openLoginModal)
-
-// Открытие модального окна входа
+//* Открытие модального окна входа
 signInBtn?.addEventListener('click', openSignInModal)
-
-// Открытие модального окна заявки
+//* Открытие модального окна заявки
 applyBtn?.addEventListener('click', openApplicationModal)
-
-// Закрытие всех модальных окон кнопками
+//* Закрытие всех модальных окон кнопками
 for (let btn of closeButtons) {
 	btn.onclick = closeAllModals
 }
 
-// Закрытие модальных окон по клику на фон
+//* Закрытие модальных окон по клику на фон
 window.onclick = closeModalOnBackgroundClick
 
-// Проверка статуса авторизации пользователя
+//* Проверка статуса авторизации пользователя
 function checkAuthStatus() {
 	const data = localStorage.getItem('currentUser')
 	const currentUser = data ? JSON.parse(data) : null
@@ -44,19 +72,17 @@ function checkAuthStatus() {
 	}
 }
 
-// Обработка отправки формы регистрации
+//* Обработка отправки формы регистрации
 const signUpForm = document.getElementById('signUpForm')
 signUpForm?.addEventListener('submit', handleSignUpSubmit)
-
-// Обработка отправки формы входа
+//* Обработка отправки формы входа
 const signInForm = document.getElementById('signInForm')
 signInForm?.addEventListener('submit', handleSignInSubmit)
-
-// Обработка отправки формы заявки
+//* Обработка отправки формы заявки
 const applicationForm = document.getElementById('applicationForm')
 applicationForm?.addEventListener('submit', handleApplicationSubmit)
 
-// Выход из аккаунта
+//* Выход из аккаунта
 function logout() {
 	localStorage.removeItem('currentUser')
 	checkAuthStatus()
@@ -64,7 +90,7 @@ function logout() {
 }
 logoutBtn?.addEventListener('click', logout)
 
-// Инициализация задач пользователя при регистрации
+//* Инициализация задач пользователя при регистрации
 function initUserTasks(userId) {
 	const tasksKey = `tasks_${userId}`
 	const lastTaskTime = localStorage.getItem(`lastTaskTime_${userId}`)
@@ -75,7 +101,7 @@ function initUserTasks(userId) {
 	}
 }
 
-// Генерация новых ежедневных заданий
+//* Генерация новых ежедневных заданий
 function generateNewTasks(userId) {
 	const tasks = [
 		{ id: 1, title: 'Добыть 64 алмаза', reward: 50, type: 'mining' },
@@ -101,7 +127,7 @@ function generateNewTasks(userId) {
 	localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
 }
 
-// Завершение задания с начислением очков
+//* Завершение задания с начислением очков
 function completeTask(userId, taskId) {
 	const tasksKey = `tasks_${userId}`
 	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
@@ -133,7 +159,7 @@ function completeTask(userId, taskId) {
 	}
 }
 
-// Пропуск задания без начисления очков
+//* Пропуск задания без начисления очков
 function skipTask(userId, taskId) {
 	const tasksKey = `tasks_${userId}`
 	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
@@ -146,7 +172,7 @@ function skipTask(userId, taskId) {
 	}
 }
 
-// Проверка таймера обновления заданий (каждые 10 минут)
+//* Проверка таймера обновления заданий (каждые 10 минут)
 function checkTaskTimer() {
 	const userData = JSON.parse(localStorage.getItem('currentUser'))
 	if (!userData) return
@@ -175,7 +201,7 @@ function checkTaskTimer() {
 	}
 }
 
-// Отрисовка списка текущих заданий
+//* Отрисовка списка текущих заданий
 function renderTasks() {
 	const tasksList = document.getElementById('tasksList')
 	if (!tasksList) return
@@ -227,7 +253,7 @@ function renderTasks() {
 		.join('')
 }
 
-// Обновление отображения очков и выполненных заданий
+//* Обновление отображения очков и выполненных заданий
 function updatePointsDisplay() {
 	const userData = JSON.parse(localStorage.getItem('currentUser'))
 	if (!userData) return
@@ -239,7 +265,7 @@ function updatePointsDisplay() {
 	if (tasksCountEl) tasksCountEl.textContent = userData.tasksCompleted || 0
 }
 
-// Расчет времени в клане по дате вступления
+//* Расчет времени в клане по дате вступления
 function calculateTimeInClan(joinDate) {
 	if (!joinDate) return 'Неизвестно'
 
@@ -257,7 +283,7 @@ function calculateTimeInClan(joinDate) {
 	}
 }
 
-// Загрузка и отображение лидерборда игроков
+//* Загрузка и отображение лидерборда игроков
 function loadLeaderboard() {
 	const container = document.getElementById('leaderboard')
 	if (!container) return
@@ -334,7 +360,7 @@ function loadLeaderboard() {
 		})
 }
 
-// Получение названия привилегии по ключу
+//* Получение названия привилегии по ключу
 function getPrivilegeName(privilege) {
 	const privilegeNames = {
 		default: 'PLAYER',
@@ -355,7 +381,7 @@ function getPrivilegeName(privilege) {
 	)
 }
 
-// Получение названия группы по ключу
+//* Получение названия группы по ключу
 function getGroupName(group) {
 	const names = {
 		LEADERS: '👑 ЛИДЕРЫ',
@@ -369,10 +395,10 @@ function getGroupName(group) {
 	return names[group] || group
 }
 
-// Инициализация приложения при загрузке DOM
+//* Инициализация приложения при загрузке DOM
 document.addEventListener('DOMContentLoaded', initializeApp)
 
-// Основная функция инициализации приложения
+//* Основная функция инициализации приложения
 function initializeApp() {
 	checkAuthStatus()
 
@@ -387,7 +413,7 @@ function initializeApp() {
 	setInterval(checkTaskTimer, 1000)
 }
 
-// Загрузка и группировка членов клана
+//* Загрузка и группировка членов клана
 function loadClanMembers(membersGrid) {
 	fetch('http://localhost:3000/api/players')
 		.then(res => res.json())
@@ -432,36 +458,36 @@ function loadClanMembers(membersGrid) {
 		})
 }
 
-// Открытие модального окна регистрации
+//* Открытие модального окна регистрации
 function openLoginModal() {
 	loginModal.style.display = 'block'
 }
 
-// Открытие модального окна входа
+//* Открытие модального окна входа
 function openSignInModal() {
 	signInModal.style.display = 'block'
 }
 
-// Открытие модального окна заявки
+//* Открытие модального окна заявки
 function openApplicationModal() {
 	applicationModal.style.display = 'block'
 }
 
-// Закрытие всех модальных окон
+//* Закрытие всех модальных окон
 function closeAllModals() {
 	if (loginModal) loginModal.style.display = 'none'
 	if (signInModal) signInModal.style.display = 'none'
 	if (applicationModal) applicationModal.style.display = 'none'
 }
 
-// Закрытие модального окна при клике на фон
+//* Закрытие модального окна при клике на фон
 function closeModalOnBackgroundClick(e) {
 	if (e.target === loginModal) loginModal.style.display = 'none'
 	if (e.target === signInModal) signInModal.style.display = 'none'
 	if (e.target === applicationModal) applicationModal.style.display = 'none'
 }
 
-// Обработка формы регистрации
+//* Обработка формы регистрации
 function handleSignUpSubmit(e) {
 	e.preventDefault()
 
@@ -528,7 +554,7 @@ function handleSignUpSubmit(e) {
 		})
 }
 
-// Обработка формы входа
+//* Обработка формы входа
 function handleSignInSubmit(e) {
 	e.preventDefault()
 
@@ -577,7 +603,7 @@ function handleSignInSubmit(e) {
 		})
 }
 
-// Обработка формы заявки в клан
+//* Обработка формы заявки в клан
 function handleApplicationSubmit(e) {
 	e.preventDefault()
 
