@@ -1,3 +1,4 @@
+// Инициализация DOM элементов
 const loginModal = document.getElementById('loginModal')
 const signInModal = document.getElementById('signInModal')
 const applicationModal = document.getElementById('applicationModal')
@@ -8,32 +9,24 @@ const closeButtons = document.getElementsByClassName('close-button')
 const profileLink = document.getElementById('profileLink')
 const logoutBtn = document.getElementById('logoutBtn')
 
-signUpBtn?.addEventListener('click', () => {
-	loginModal.style.display = 'block'
-})
+// Открытие модального окна регистрации
+signUpBtn?.addEventListener('click', openLoginModal)
 
-signInBtn?.addEventListener('click', () => {
-	signInModal.style.display = 'block'
-})
+// Открытие модального окна входа
+signInBtn?.addEventListener('click', openSignInModal)
 
-applyBtn?.addEventListener('click', () => {
-	applicationModal.style.display = 'block'
-})
+// Открытие модального окна заявки
+applyBtn?.addEventListener('click', openApplicationModal)
 
+// Закрытие всех модальных окон кнопками
 for (let btn of closeButtons) {
-	btn.onclick = () => {
-		if (loginModal) loginModal.style.display = 'none'
-		if (signInModal) signInModal.style.display = 'none'
-		if (applicationModal) applicationModal.style.display = 'none'
-	}
+	btn.onclick = closeAllModals
 }
 
-window.onclick = e => {
-	if (e.target === loginModal) loginModal.style.display = 'none'
-	if (e.target === signInModal) signInModal.style.display = 'none'
-	if (e.target === applicationModal) applicationModal.style.display = 'none'
-}
+// Закрытие модальных окон по клику на фон
+window.onclick = closeModalOnBackgroundClick
 
+// Проверка статуса авторизации пользователя
 function checkAuthStatus() {
 	const data = localStorage.getItem('currentUser')
 	const currentUser = data ? JSON.parse(data) : null
@@ -51,9 +44,425 @@ function checkAuthStatus() {
 	}
 }
 
+// Обработка отправки формы регистрации
 const signUpForm = document.getElementById('signUpForm')
+signUpForm?.addEventListener('submit', handleSignUpSubmit)
 
-signUpForm?.addEventListener('submit', e => {
+// Обработка отправки формы входа
+const signInForm = document.getElementById('signInForm')
+signInForm?.addEventListener('submit', handleSignInSubmit)
+
+// Обработка отправки формы заявки
+const applicationForm = document.getElementById('applicationForm')
+applicationForm?.addEventListener('submit', handleApplicationSubmit)
+
+// Выход из аккаунта
+function logout() {
+	localStorage.removeItem('currentUser')
+	checkAuthStatus()
+	window.location.reload()
+}
+logoutBtn?.addEventListener('click', logout)
+
+// Инициализация задач пользователя при регистрации
+function initUserTasks(userId) {
+	const tasksKey = `tasks_${userId}`
+	const lastTaskTime = localStorage.getItem(`lastTaskTime_${userId}`)
+
+	if (!lastTaskTime) {
+		localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
+		generateNewTasks(userId)
+	}
+}
+
+// Генерация новых ежедневных заданий
+function generateNewTasks(userId) {
+	const tasks = [
+		{ id: 1, title: 'Добыть 64 алмаза', reward: 50, type: 'mining' },
+		{ id: 2, title: 'Победить 10 игроков в PvP', reward: 100, type: 'pvp' },
+		{ id: 3, title: 'Построить дом 10x10', reward: 30, type: 'building' },
+		{ id: 4, title: 'Добыть 128 железа', reward: 40, type: 'mining' },
+		{ id: 5, title: 'Приручить 5 волков', reward: 25, type: 'taming' },
+		{ id: 6, title: 'Убить эндер дракона', reward: 200, type: 'boss' },
+		{ id: 7, title: 'Собрать 64 изумруда', reward: 80, type: 'mining' },
+		{ id: 8, title: 'Провести 2 часа онлайн', reward: 20, type: 'activity' },
+		{ id: 9, title: 'Помочь участнику клана', reward: 35, type: 'social' },
+		{ id: 10, title: 'Найти крепость', reward: 60, type: 'exploration' },
+	]
+
+	const shuffled = tasks.sort(() => Math.random() - 0.5)
+	const selectedTasks = shuffled.slice(0, 3).map(task => ({
+		...task,
+		completed: false,
+		skipped: false,
+	}))
+
+	localStorage.setItem(`tasks_${userId}`, JSON.stringify(selectedTasks))
+	localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
+}
+
+// Завершение задания с начислением очков
+function completeTask(userId, taskId) {
+	const tasksKey = `tasks_${userId}`
+	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
+	const task = tasks.find(t => t.id === taskId)
+
+	if (task && !task.completed && !task.skipped) {
+		task.completed = true
+		localStorage.setItem(tasksKey, JSON.stringify(tasks))
+
+		const userData = JSON.parse(localStorage.getItem('currentUser'))
+		userData.points = (userData.points || 0) + task.reward
+		userData.tasksCompleted = (userData.tasksCompleted || 0) + 1
+		localStorage.setItem('currentUser', JSON.stringify(userData))
+
+		fetch('http://localhost:3000/api/players/update-points', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				nickname: userData.name,
+				points: userData.points,
+			}),
+		})
+			.then(() => {
+				updatePointsDisplay()
+				renderTasks()
+				loadLeaderboard()
+			})
+			.catch(err => console.error('Ошибка синхронизации с сервером:', err))
+	}
+}
+
+// Пропуск задания без начисления очков
+function skipTask(userId, taskId) {
+	const tasksKey = `tasks_${userId}`
+	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
+	const task = tasks.find(t => t.id === taskId)
+
+	if (task && !task.completed && !task.skipped) {
+		task.skipped = true
+		localStorage.setItem(tasksKey, JSON.stringify(tasks))
+		renderTasks()
+	}
+}
+
+// Проверка таймера обновления заданий (каждые 10 минут)
+function checkTaskTimer() {
+	const userData = JSON.parse(localStorage.getItem('currentUser'))
+	if (!userData) return
+
+	const userId = userData.id
+	const lastTaskTime = parseInt(
+		localStorage.getItem(`lastTaskTime_${userId}`) || '0'
+	)
+	const currentTime = Date.now()
+	const timeDiff = currentTime - lastTaskTime
+	const tenMinutes = 10 * 60 * 1000
+
+	if (timeDiff >= tenMinutes) {
+		generateNewTasks(userId)
+		renderTasks()
+	}
+
+	const nextTaskEl = document.getElementById('nextTaskTime')
+	if (nextTaskEl) {
+		const timeLeft = tenMinutes - timeDiff
+		const minutes = Math.floor(timeLeft / 60000)
+		const seconds = Math.floor((timeLeft % 60000) / 1000)
+		nextTaskEl.textContent = `Новые задания через: ${minutes}:${seconds
+			.toString()
+			.padStart(2, '0')}`
+	}
+}
+
+// Отрисовка списка текущих заданий
+function renderTasks() {
+	const tasksList = document.getElementById('tasksList')
+	if (!tasksList) return
+
+	const userData = JSON.parse(localStorage.getItem('currentUser'))
+	if (!userData) return
+
+	const tasks = JSON.parse(localStorage.getItem(`tasks_${userData.id}`) || '[]')
+
+	if (tasks.length === 0) {
+		tasksList.innerHTML =
+			'<div class="empty-state">Задания скоро появятся</div>'
+		return
+	}
+
+	tasksList.innerHTML = tasks
+		.map(
+			task => `
+    <div class="task-item ${task.completed ? 'completed' : ''} ${
+				task.skipped ? 'skipped' : ''
+			}">
+      <div class="task-info">
+        <h3>${task.title}</h3>
+        <span class="task-reward">+${task.reward} очков</span>
+      </div>
+      <div class="task-actions">
+        ${
+					!task.completed && !task.skipped
+						? `
+          <button onclick="completeTask(${userData.id}, ${task.id})" class="btn-complete">✓ Выполнить</button>
+          <button onclick="skipTask(${userData.id}, ${task.id})" class="btn-skip">✗ Пропустить</button>
+        `
+						: ''
+				}
+        ${
+					task.completed
+						? '<span class="status-badge completed">Выполнено</span>'
+						: ''
+				}
+        ${
+					task.skipped
+						? '<span class="status-badge skipped">Пропущено</span>'
+						: ''
+				}
+      </div>
+    </div>
+  `
+		)
+		.join('')
+}
+
+// Обновление отображения очков и выполненных заданий
+function updatePointsDisplay() {
+	const userData = JSON.parse(localStorage.getItem('currentUser'))
+	if (!userData) return
+
+	const pointsEl = document.getElementById('pointsCount')
+	const tasksCountEl = document.getElementById('tasksCount')
+
+	if (pointsEl) pointsEl.textContent = userData.points || 0
+	if (tasksCountEl) tasksCountEl.textContent = userData.tasksCompleted || 0
+}
+
+// Расчет времени в клане по дате вступления
+function calculateTimeInClan(joinDate) {
+	if (!joinDate) return 'Неизвестно'
+
+	const join = new Date(joinDate)
+	const now = new Date()
+	const diff = now - join
+
+	const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+	const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+	if (days > 0) {
+		return `${days} дней ${hours} часов`
+	} else {
+		return `${hours} часов`
+	}
+}
+
+// Загрузка и отображение лидерборда игроков
+function loadLeaderboard() {
+	const container = document.getElementById('leaderboard')
+	if (!container) return
+
+	const localUserData = JSON.parse(localStorage.getItem('currentUser'))
+
+	fetch('http://localhost:3000/api/players')
+		.then(res => res.json())
+		.then(serverPlayers => {
+			let allPlayers = [...serverPlayers]
+
+			if (localUserData) {
+				const existIndex = allPlayers.findIndex(
+					p =>
+						p.login === localUserData.login || p.nickname === localUserData.name
+				)
+
+				if (existIndex !== -1) {
+					allPlayers[existIndex].points = Math.max(
+						allPlayers[existIndex].points,
+						localUserData.points || 0
+					)
+				} else {
+					allPlayers.push({
+						nickname: localUserData.name || localUserData.login,
+						group: localUserData.category || 'PLAYER',
+						points: localUserData.points || 0,
+						isLocal: true,
+					})
+				}
+			}
+
+			const sorted = allPlayers.sort((a, b) => b.points - a.points)
+
+			if (sorted.length === 0) {
+				container.innerHTML =
+					'<div class="empty-state">Участников пока нет</div>'
+				return
+			}
+
+			container.innerHTML = sorted
+				.map((player, index) => {
+					const isCurrent =
+						localUserData &&
+						(player.nickname === localUserData.name ||
+							player.login === localUserData.login)
+
+					return `
+              <div class="leaderboard-row rank-${index + 1} ${
+						isCurrent ? 'current-user-row' : ''
+					}">
+                  <div class="rank-info">
+                      <span class="rank-number">#${index + 1}</span>
+                      <div>
+                          <span class="player-name">${player.nickname} ${
+						isCurrent ? '(ВЫ)' : ''
+					}</span>
+                          <span class="player-group">${getGroupName(
+														player.group
+													)}</span>
+                      </div>
+                  </div>
+                  <div class="player-points">
+                      <span class="points-val">${player.points.toLocaleString()}</span>
+                      <span class="points-label">очков</span>
+                  </div>
+              </div>
+          `
+				})
+				.join('')
+		})
+		.catch(() => {
+			container.innerHTML = '<div class="empty-state">Ошибка загрузки API</div>'
+		})
+}
+
+// Получение названия привилегии по ключу
+function getPrivilegeName(privilege) {
+	const privilegeNames = {
+		default: 'PLAYER',
+		vip: 'GRIFER',
+		premium: 'MUSTANG',
+		moder: 'GHAST',
+		admin: 'WITHER',
+		kraken: 'KRAKEN',
+		dragon: 'DRAGON',
+		stinger: 'STINGER',
+		eternity: 'ETERNITY',
+		trainee: 'СТАЖЁР',
+	}
+
+	return (
+		privilegeNames[privilege] ||
+		(privilege ? privilege.toUpperCase() : 'УЧАСТНИК')
+	)
+}
+
+// Получение названия группы по ключу
+function getGroupName(group) {
+	const names = {
+		LEADERS: '👑 ЛИДЕРЫ',
+		ADMINS: '⚙️ АДМИНЫ',
+		PVP: '⚔️ PVP',
+		UNI: '🎯 UNI',
+		PVE: '🛡️ PVE',
+		TSD: '📊 TSD',
+		RESERVE: '⏳ РЕЗЕРВ',
+	}
+	return names[group] || group
+}
+
+// Инициализация приложения при загрузке DOM
+document.addEventListener('DOMContentLoaded', initializeApp)
+
+// Основная функция инициализации приложения
+function initializeApp() {
+	checkAuthStatus()
+
+	const membersGrid = document.getElementById('members-grid')
+	if (membersGrid) {
+		loadClanMembers(membersGrid)
+	}
+	loadLeaderboard()
+	updatePointsDisplay()
+	renderTasks()
+	checkTaskTimer()
+	setInterval(checkTaskTimer, 1000)
+}
+
+// Загрузка и группировка членов клана
+function loadClanMembers(membersGrid) {
+	fetch('http://localhost:3000/api/players')
+		.then(res => res.json())
+		.then(players => {
+			membersGrid.innerHTML = ''
+			const groupedPlayers = {}
+
+			players.forEach(player => {
+				const group = player.group || player.squad || 'RESERVE'
+				if (!groupedPlayers[group]) {
+					groupedPlayers[group] = []
+				}
+				groupedPlayers[group].push(player)
+			})
+
+			Object.entries(groupedPlayers).forEach(([groupName, groupPlayers]) => {
+				const groupCard = document.createElement('div')
+				groupCard.className = 'group-section'
+
+				groupCard.innerHTML = `
+          <h3>${getGroupName(groupName)}</h3>
+          <div class="group-members">
+            ${groupPlayers
+							.map(
+								player => `
+              <div class="member">
+                <strong>${player.nickname}</strong>
+                <span>${player.role || 'MEMBER'}</span>
+              </div>
+            `
+							)
+							.join('')}
+          </div>
+        `
+
+				membersGrid.appendChild(groupCard)
+			})
+		})
+		.catch(err => {
+			console.error(err)
+			membersGrid.innerHTML = '<p>Не удалось загрузить состав клана.</p>'
+		})
+}
+
+// Открытие модального окна регистрации
+function openLoginModal() {
+	loginModal.style.display = 'block'
+}
+
+// Открытие модального окна входа
+function openSignInModal() {
+	signInModal.style.display = 'block'
+}
+
+// Открытие модального окна заявки
+function openApplicationModal() {
+	applicationModal.style.display = 'block'
+}
+
+// Закрытие всех модальных окон
+function closeAllModals() {
+	if (loginModal) loginModal.style.display = 'none'
+	if (signInModal) signInModal.style.display = 'none'
+	if (applicationModal) applicationModal.style.display = 'none'
+}
+
+// Закрытие модального окна при клике на фон
+function closeModalOnBackgroundClick(e) {
+	if (e.target === loginModal) loginModal.style.display = 'none'
+	if (e.target === signInModal) signInModal.style.display = 'none'
+	if (e.target === applicationModal) applicationModal.style.display = 'none'
+}
+
+// Обработка формы регистрации
+function handleSignUpSubmit(e) {
 	e.preventDefault()
 
 	const name = document.getElementById('signUpUsername').value.trim()
@@ -117,11 +526,10 @@ signUpForm?.addEventListener('submit', e => {
 			console.error(err)
 			alert('Ошибка при регистрации: ' + (err.message || 'Попробуйте позже'))
 		})
-})
+}
 
-const signInForm = document.getElementById('signInForm')
-
-signInForm?.addEventListener('submit', e => {
+// Обработка формы входа
+function handleSignInSubmit(e) {
 	e.preventDefault()
 
 	const login = document.getElementById('signInUser').value.trim()
@@ -167,11 +575,10 @@ signInForm?.addEventListener('submit', e => {
 			console.error(err)
 			alert('Ошибка при входе: ' + err.message)
 		})
-})
+}
 
-const applicationForm = document.getElementById('applicationForm')
-
-applicationForm?.addEventListener('submit', e => {
+// Обработка формы заявки в клан
+function handleApplicationSubmit(e) {
 	e.preventDefault()
 
 	const nickname = document.getElementById('appNickname').value.trim()
@@ -219,390 +626,4 @@ applicationForm?.addEventListener('submit', e => {
 				'Ошибка при отправке заявки: ' + (err.message || 'Попробуйте позже')
 			)
 		})
-})
-
-function logout() {
-	localStorage.removeItem('currentUser')
-	checkAuthStatus()
-	window.location.reload()
-}
-
-logoutBtn?.addEventListener('click', logout)
-
-document.addEventListener('DOMContentLoaded', () => {
-	checkAuthStatus()
-
-	const membersGrid = document.getElementById('members-grid')
-	if (membersGrid) {
-		fetch('http://localhost:3000/api/players')
-			.then(res => res.json())
-			.then(players => {
-				membersGrid.innerHTML = ''
-				const groupedPlayers = {}
-				players.forEach(player => {
-					const group = player.group || player.squad || 'RESERVE'
-					if (!groupedPlayers[group]) {
-						groupedPlayers[group] = []
-					}
-					groupedPlayers[group].push(player)
-				})
-
-				Object.entries(groupedPlayers).forEach(([groupName, groupPlayers]) => {
-					const groupCard = document.createElement('div')
-					groupCard.className = 'group-section'
-
-					groupCard.innerHTML = `
-            <h3>${getGroupName(groupName)}</h3>
-            <div class="group-members">
-              ${groupPlayers
-								.map(
-									player => `
-                <div class="member">
-                  <strong>${player.nickname}</strong>
-                  <span>${player.role || 'MEMBER'}</span>
-                </div>
-              `
-								)
-								.join('')}
-            </div>
-          `
-
-					membersGrid.appendChild(groupCard)
-				})
-			})
-			.catch(err => {
-				console.error(err)
-				membersGrid.innerHTML = '<p>Не удалось загрузить состав клана.</p>'
-			})
-	}
-	loadLeaderboard()
-
-	updatePointsDisplay()
-	renderTasks()
-	checkTaskTimer()
-	setInterval(checkTaskTimer, 1000)
-})
-
-function initUserTasks(userId) {
-	const tasksKey = `tasks_${userId}`
-	const lastTaskTime = localStorage.getItem(`lastTaskTime_${userId}`)
-
-	if (!lastTaskTime) {
-		localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
-		generateNewTasks(userId)
-	}
-}
-
-function generateNewTasks(userId) {
-	const tasks = [
-		{ id: 1, title: 'Добыть 64 алмаза', reward: 50, type: 'mining' },
-		{ id: 2, title: 'Победить 10 игроков в PvP', reward: 100, type: 'pvp' },
-		{ id: 3, title: 'Построить дом 10x10', reward: 30, type: 'building' },
-		{ id: 4, title: 'Добыть 128 железа', reward: 40, type: 'mining' },
-		{ id: 5, title: 'Приручить 5 волков', reward: 25, type: 'taming' },
-		{ id: 6, title: 'Убить эндер дракона', reward: 200, type: 'boss' },
-		{ id: 7, title: 'Собрать 64 изумруда', reward: 80, type: 'mining' },
-		{ id: 8, title: 'Провести 2 часа онлайн', reward: 20, type: 'activity' },
-		{ id: 9, title: 'Помочь участнику клана', reward: 35, type: 'social' },
-		{ id: 10, title: 'Найти крепость', reward: 60, type: 'exploration' },
-	]
-
-	const shuffled = tasks.sort(() => Math.random() - 0.5)
-	const selectedTasks = shuffled.slice(0, 3).map(task => ({
-		...task,
-		completed: false,
-		skipped: false,
-	}))
-
-	localStorage.setItem(`tasks_${userId}`, JSON.stringify(selectedTasks))
-	localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
-}
-
-function completeTask(userId, taskId) {
-	const tasksKey = `tasks_${userId}`
-	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
-	const task = tasks.find(t => t.id === taskId)
-
-	if (task && !task.completed && !task.skipped) {
-		task.completed = true
-		localStorage.setItem(tasksKey, JSON.stringify(tasks))
-
-		const userData = JSON.parse(localStorage.getItem('currentUser'))
-		userData.points = (userData.points || 0) + task.reward
-		userData.tasksCompleted = (userData.tasksCompleted || 0) + 1
-		localStorage.setItem('currentUser', JSON.stringify(userData))
-
-		fetch('http://localhost:3000/api/players/update-points', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				nickname: userData.name,
-				points: userData.points,
-			}),
-		})
-			.then(() => {
-				updatePointsDisplay()
-				renderTasks()
-				loadLeaderboard()
-			})
-			.catch(err => console.error('Ошибка синхронизации с сервером:', err))
-	}
-}
-
-function skipTask(userId, taskId) {
-	const tasksKey = `tasks_${userId}`
-	const tasks = JSON.parse(localStorage.getItem(tasksKey) || '[]')
-	const task = tasks.find(t => t.id === taskId)
-
-	if (task && !task.completed && !task.skipped) {
-		task.skipped = true
-		localStorage.setItem(tasksKey, JSON.stringify(tasks))
-		renderTasks()
-	}
-}
-
-function checkTaskTimer() {
-	const userData = JSON.parse(localStorage.getItem('currentUser'))
-	if (!userData) return
-
-	const userId = userData.id
-	const lastTaskTime = parseInt(
-		localStorage.getItem(`lastTaskTime_${userId}`) || '0'
-	)
-	const currentTime = Date.now()
-	const timeDiff = currentTime - lastTaskTime
-	const tenMinutes = 10 * 60 * 1000
-
-	if (timeDiff >= tenMinutes) {
-		generateNewTasks(userId)
-		renderTasks()
-	}
-
-	const nextTaskEl = document.getElementById('nextTaskTime')
-	if (nextTaskEl) {
-		const timeLeft = tenMinutes - timeDiff
-		const minutes = Math.floor(timeLeft / 60000)
-		const seconds = Math.floor((timeLeft % 60000) / 1000)
-		nextTaskEl.textContent = `Новые задания через: ${minutes}:${seconds
-			.toString()
-			.padStart(2, '0')}`
-	}
-}
-
-function renderTasks() {
-	const tasksList = document.getElementById('tasksList')
-	if (!tasksList) return
-
-	const userData = JSON.parse(localStorage.getItem('currentUser'))
-	if (!userData) return
-
-	const tasks = JSON.parse(localStorage.getItem(`tasks_${userData.id}`) || '[]')
-
-	if (tasks.length === 0) {
-		tasksList.innerHTML =
-			'<div class="empty-state">Задания скоро появятся</div>'
-		return
-	}
-
-	tasksList.innerHTML = tasks
-		.map(
-			task => `
-		<div class="task-item ${task.completed ? 'completed' : ''} ${
-				task.skipped ? 'skipped' : ''
-			}">
-			<div class="task-info">
-				<h3>${task.title}</h3>
-				<span class="task-reward">+${task.reward} очков</span>
-			</div>
-			<div class="task-actions">
-				${
-					!task.completed && !task.skipped
-						? `
-					<button onclick="completeTask(${userData.id}, ${task.id})" class="btn-complete">✓ Выполнить</button>
-					<button onclick="skipTask(${userData.id}, ${task.id})" class="btn-skip">✗ Пропустить</button>
-				`
-						: ''
-				}
-				${task.completed ? '<span class="status-badge completed">Выполнено</span>' : ''}
-				${task.skipped ? '<span class="status-badge skipped">Пропущено</span>' : ''}
-			</div>
-		</div>
-	`
-		)
-		.join('')
-}
-
-function updatePointsDisplay() {
-	const userData = JSON.parse(localStorage.getItem('currentUser'))
-	if (!userData) return
-
-	const pointsEl = document.getElementById('pointsCount')
-	const tasksCountEl = document.getElementById('tasksCount')
-
-	if (pointsEl) pointsEl.textContent = userData.points || 0
-	if (tasksCountEl) tasksCountEl.textContent = userData.tasksCompleted || 0
-}
-
-function calculateTimeInClan(joinDate) {
-	if (!joinDate) return 'Неизвестно'
-
-	const join = new Date(joinDate)
-	const now = new Date()
-	const diff = now - join
-
-	const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-	const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-
-	if (days > 0) {
-		return `${days} дней ${hours} часов`
-	} else {
-		return `${hours} часов`
-	}
-}
-
-function loadLeaderboard() {
-	const container = document.getElementById('leaderboard')
-	if (!container) return
-
-	const localUserData = JSON.parse(localStorage.getItem('currentUser'))
-
-	fetch('http://localhost:3000/api/players')
-		.then(res => res.json())
-		.then(serverPlayers => {
-			let allPlayers = [...serverPlayers]
-
-			if (localUserData) {
-				const existIndex = allPlayers.findIndex(
-					p =>
-						p.login === localUserData.login || p.nickname === localUserData.name
-				)
-
-				if (existIndex !== -1) {
-					allPlayers[existIndex].points = Math.max(
-						allPlayers[existIndex].points,
-						localUserData.points || 0
-					)
-				} else {
-					allPlayers.push({
-						nickname: localUserData.name || localUserData.login,
-						group: localUserData.category || 'PLAYER',
-						points: localUserData.points || 0,
-						isLocal: true,
-					})
-				}
-			}
-
-			const sorted = allPlayers.sort((a, b) => b.points - a.points)
-
-			if (sorted.length === 0) {
-				container.innerHTML =
-					'<div class="empty-state">Участников пока нет</div>'
-				return
-			}
-
-			container.innerHTML = sorted
-				.map((player, index) => {
-					const isCurrent =
-						localUserData &&
-						(player.nickname === localUserData.name ||
-							player.login === localUserData.login)
-
-					return `
-                <div class="leaderboard-row rank-${index + 1} ${
-						isCurrent ? 'current-user-row' : ''
-					}">
-                    <div class="rank-info">
-                        <span class="rank-number">#${index + 1}</span>
-                        <div>
-                            <span class="player-name">${player.nickname} ${
-						isCurrent ? '(ВЫ)' : ''
-					}</span>
-                            <span class="player-group">${getGroupName(
-															player.group
-														)}</span>
-                        </div>
-                    </div>
-                    <div class="player-points">
-                        <span class="points-val">${player.points.toLocaleString()}</span>
-                        <span class="points-label">очков</span>
-                    </div>
-                </div>
-            `
-				})
-				.join('')
-		})
-		.catch(() => {
-			container.innerHTML = '<div class="empty-state">Ошибка загрузки API</div>'
-		})
-}
-document.addEventListener('DOMContentLoaded', () => {
-	const data = localStorage.getItem('currentUser')
-	const currentUser = data ? JSON.parse(data) : null
-
-	const usernameEl = document.getElementById('profileUsername')
-	const privilegeEl = document.getElementById('profilePrivilege')
-	const categoryEl = document.getElementById('profileCategory')
-	const timeInClanEl = document.getElementById('timeInClan')
-
-	if (!currentUser) {
-		if (usernameEl) usernameEl.textContent = 'Гость'
-		if (privilegeEl) privilegeEl.textContent = 'НЕ АВТОРИЗОВАН'
-		if (categoryEl) categoryEl.textContent = ''
-		if (timeInClanEl) timeInClanEl.textContent = ''
-		return
-	}
-
-	if (usernameEl) usernameEl.textContent = currentUser.name || currentUser.login
-
-	if (privilegeEl) {
-		const privilegeName = getPrivilegeName(currentUser.privilege)
-		privilegeEl.textContent = privilegeName
-	}
-
-	if (categoryEl && currentUser.category) {
-		const categoryName = getGroupName(currentUser.category)
-		categoryEl.textContent = categoryName
-	}
-
-	if (timeInClanEl) {
-		timeInClanEl.textContent = calculateTimeInClan(currentUser.joinDate)
-	}
-
-	updatePointsDisplay()
-	renderTasks()
-	checkTaskTimer()
-	setInterval(checkTaskTimer, 1000)
-})
-
-function getPrivilegeName(privilege) {
-	const privilegeNames = {
-		default: 'PLAYER',
-		vip: 'GRIFER',
-		premium: 'MUSTANG',
-		moder: 'GHAST',
-		admin: 'WITHER',
-		kraken: 'KRAKEN',
-		dragon: 'DRAGON',
-		stinger: 'STINGER',
-		eternity: 'ETERNITY',
-		trainee: 'СТАЖЁР',
-	}
-
-	return (
-		privilegeNames[privilege] ||
-		(privilege ? privilege.toUpperCase() : 'УЧАСТНИК')
-	)
-}
-
-function getGroupName(group) {
-	const names = {
-		LEADERS: '👑 ЛИДЕРЫ',
-		ADMINS: '⚙️ АДМИНЫ',
-		PVP: '⚔️ PVP',
-		UNI: '🎯 UNI',
-		PVE: '🛡️ PVE',
-		TSD: '📊 TSD',
-		RESERVE: '⏳ РЕЗЕРВ',
-	}
-	return names[group] || group
 }
