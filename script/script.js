@@ -1,6 +1,5 @@
-
 //? Модальные окна:
-//?openLoginModal() - открытие регистрации
+//? openLoginModal() - открытие регистрации
 //? openSignInModal() - открытие входа
 //? openApplicationModal() - открытие заявки
 //? closeAllModals() - закрытие всех модалок
@@ -11,6 +10,7 @@
 //? handleSignUpSubmit() - обработка регистрации
 //? handleSignInSubmit() - обработка входа
 //? handleApplicationSubmit() - обработка заявки
+//? loadProfileData() - загрузка данных профиля пользователя
 
 //? Система заданий:
 //? initUserTasks() - инициализация задач
@@ -27,7 +27,7 @@
 //? loadClanMembers() - состав клана
 //? initializeApp() - полная инициализация
 
-//!================================================= 
+//!=================================================
 
 //* Инициализация DOM элементов
 const loginModal = document.getElementById('loginModal')
@@ -42,10 +42,13 @@ const logoutBtn = document.getElementById('logoutBtn')
 
 //* Открытие модального окна регистрации
 signUpBtn?.addEventListener('click', openLoginModal)
+
 //* Открытие модального окна входа
 signInBtn?.addEventListener('click', openSignInModal)
+
 //* Открытие модального окна заявки
 applyBtn?.addEventListener('click', openApplicationModal)
+
 //* Закрытие всех модальных окон кнопками
 for (let btn of closeButtons) {
 	btn.onclick = closeAllModals
@@ -75,9 +78,11 @@ function checkAuthStatus() {
 //* Обработка отправки формы регистрации
 const signUpForm = document.getElementById('signUpForm')
 signUpForm?.addEventListener('submit', handleSignUpSubmit)
+
 //* Обработка отправки формы входа
 const signInForm = document.getElementById('signInForm')
 signInForm?.addEventListener('submit', handleSignInSubmit)
+
 //* Обработка отправки формы заявки
 const applicationForm = document.getElementById('applicationForm')
 applicationForm?.addEventListener('submit', handleApplicationSubmit)
@@ -125,6 +130,46 @@ function generateNewTasks(userId) {
 
 	localStorage.setItem(`tasks_${userId}`, JSON.stringify(selectedTasks))
 	localStorage.setItem(`lastTaskTime_${userId}`, Date.now().toString())
+}
+
+//* Загрузка данных профиля пользователя
+function loadProfileData() {
+	const data = localStorage.getItem('currentUser')
+	const currentUser = data ? JSON.parse(data) : null
+
+	const usernameEl = document.getElementById('profileUsername')
+	const privilegeEl = document.getElementById('profilePrivilege')
+	const categoryEl = document.getElementById('profileCategory')
+	const timeInClanEl = document.getElementById('timeInClan')
+
+	if (!currentUser) {
+		if (usernameEl) usernameEl.textContent = 'Гость'
+		if (privilegeEl) privilegeEl.textContent = 'НЕ АВТОРИЗОВАН'
+		if (categoryEl) categoryEl.textContent = ''
+		if (timeInClanEl) timeInClanEl.textContent = ''
+		return
+	}
+
+	if (usernameEl) usernameEl.textContent = currentUser.name || currentUser.login
+
+	if (privilegeEl) {
+		const privilegeName = getPrivilegeName(currentUser.privilege)
+		privilegeEl.textContent = privilegeName
+	}
+
+	if (categoryEl && currentUser.category) {
+		const categoryName = getGroupName(currentUser.category)
+		categoryEl.textContent = categoryName
+	}
+
+	if (timeInClanEl) {
+		timeInClanEl.textContent = calculateTimeInClan(currentUser.joinDate)
+	}
+
+	updatePointsDisplay()
+	renderTasks()
+	checkTaskTimer()
+	setInterval(checkTaskTimer, 1000)
 }
 
 //* Завершение задания с начислением очков
@@ -402,10 +447,17 @@ document.addEventListener('DOMContentLoaded', initializeApp)
 function initializeApp() {
 	checkAuthStatus()
 
+	// если есть блок профиля – загружаем данные профиля
+	const usernameEl = document.getElementById('profileUsername')
+	if (usernameEl) {
+		loadProfileData()
+	}
+
 	const membersGrid = document.getElementById('members-grid')
 	if (membersGrid) {
 		loadClanMembers(membersGrid)
 	}
+
 	loadLeaderboard()
 	updatePointsDisplay()
 	renderTasks()
